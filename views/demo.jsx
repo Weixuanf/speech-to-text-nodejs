@@ -8,7 +8,6 @@ import {Transcript} from './transcript.jsx';
 import {Keywords, getKeywordsSummary} from './keywords.jsx';
 import {SpeakersView} from './speaker.jsx';
 import {TimingView} from './timing.jsx';
-import JSONView from './json-view.jsx';
 import samples from '../src/data/samples.json';
 import cachedModels from '../src/data/models.json';
 
@@ -23,7 +22,7 @@ export default React.createClass({
       rawMessages: [],
       formattedMessages: [],
       audioSource: null,
-      speakerLabels: true,
+      speakerLabels: false,
       keywords: this.getKeywords('en-US_BroadbandModel'),
       // transcript model and keywords are the state that they were when the button was clicked.
       // Changing them during a transcription would cause a mismatch between the setting sent to the service and what is displayed on the demo, and could cause bugs.
@@ -106,70 +105,6 @@ export default React.createClass({
     this.handleStream(recognizeMicrophone(this.getRecognizeOptions()));
   },
 
-  handleUploadClick() {
-    if (this.state.audioSource === 'upload') {
-      this.stopTranscription();
-    } else {
-      this.dropzone.open();
-    }
-  },
-
-  handleUserFile: function(files) {
-    const file = files[0];
-    if (!file) {
-      return;
-    }
-    this.reset();
-    this.setState({audioSource: 'upload'});
-    this.playFile(file);
-  },
-
-  handleUserFileRejection: function() {
-    this.setState({error: 'Sorry, that file does not appear to be compatible.'});
-  },
-  handleSample1Click() {
-    this.handleSampleClick(1);
-  },
-  handleSample2Click() {
-    this.handleSampleClick(2);
-  },
-
-  handleSampleClick(which) {
-    if (this.state.audioSource === 'sample-' + which) {
-      return this.stopTranscription();
-    }
-    let filename = samples[this.state.model] && samples[this.state.model][which - 1].filename;
-    if (!filename) {
-      return this.handleError(`No sample ${which} available for model ${this.state.model}`, samples[this.state.model]);
-    }
-    this.reset();
-    this.setState({
-      audioSource: 'sample-' + which
-    });
-    this.playFile('audio/' + filename);
-  },
-
-  /**
-     * @param {File|Blob|String} file - url to an audio file or a File instance fro user-provided files
-     */
-  playFile(file) {
-    // The recognizeFile() method is a helper method provided by the watson-speach package
-    // It accepts a file input and transcribes the contents over a WebSocket connection
-    // It also provides a number of optional features, some of which are enabled by default:
-    //  * enables object mode by default (options.objectMode)
-    //  * plays the file in the browser if possible (options.play)
-    //  * formats results (Capitals, periods, etc.) (options.format)
-    //  * slows results down to realtime speed if received faster than realtime - this causes extra interim `data` events to be emitted (options.realtime)
-    //  * combines speaker_labels with results (options.resultsBySpeaker)
-    //  * outputs the text to a DOM element - not used in this demo because it doesn't play nice with react (options.outputElement)
-    //  * a few other things for backwards compatibility and sane defaults
-    // In addition to this, it passes other service-level options along to the RecognizeStream that manages the actual WebSocket connection.
-    this.handleStream(recognizeFile(this.getRecognizeOptions({
-      file: file, play: true, // play the audio out loud
-      realtime: true, // use a helper stream to slow down the transcript output to match the audio speed
-    })));
-  },
-
   handleStream(stream) {
     // cleanup old stream if appropriate
     if (this.stream) {
@@ -249,20 +184,6 @@ export default React.createClass({
     return files && files.length >= 2 && files[0].keywords + ', ' + files[1].keywords || '';
   },
 
-  handleModelChange(model) {
-    this.setState({model, keywords: this.getKeywords(model), speakerLabels: this.supportsSpeakerLabels(model)});
-
-    // clear the microphone narrowband error if it's visible and a broadband model was just selected
-    if (this.state.error === ERR_MIC_NARROWBAND && !this.isNarrowBand(model)) {
-      this.setState({error: null});
-    }
-
-    // clear the speaker_lables is not supported error - e.g.
-    // speaker_labels is not a supported feature for model en-US_BroadbandModel
-    if (this.state.error && this.state.error.indexOf('speaker_labels is not a supported feature for model') === 0) {
-      this.setState({error: null});
-    }
-  },
 
   supportsSpeakerLabels(model) {
     model = model || this.state.model;
@@ -270,15 +191,6 @@ export default React.createClass({
     return cachedModels.some(m => m.name === model && m.supported_features.speaker_labels);
   },
 
-  handleSpeakerLabelsChange() {
-    this.setState({
-      speakerLabels: !this.state.speakerLabels
-    });
-  },
-
-  handleKeywordsChange(e) {
-    this.setState({keywords: e.target.value});
-  },
 
   // cleans up the keywords string into an array of individual, trimmed, non-empty keywords/phrases
   getKeywordsArr() {
@@ -351,62 +263,7 @@ export default React.createClass({
         <li className="base--li base--p_light">Use your microphone to record audio. (Not supported in current browser)</li>;
 
     return (
-      <Dropzone onDropAccepted={this.handleUserFile} onDropRejected={this.handleUserFileRejection} maxSize={200 * 1024 * 1024} accept="audio/wav, audio/l16, audio/ogg, audio/flac, .wav, .ogg, .opus, .flac" disableClick={true} className="dropzone _container _container_large" activeClassName="dropzone-active" rejectClassName="dropzone-reject" ref={(node) => {
-        this.dropzone = node;
-      }}>
-
-        <div className="drop-info-container">
-          <div className="drop-info">
-            <h1>Drop an audio file here.</h1>
-            <p>Watson Speech to Text supports .wav, .opus, and .flac files up to 200mb.</p>
-          </div>
-        </div>
-
-        <h2 className="base--h2">Transcribe Audio</h2>
-
-        <ul className="base--ul">
-            {micBullet}
-            <li className="base--li">Upload pre-recorded audio (.wav, .flac, or .opus only).</li>
-            <li className="base--li">Play one of the sample audio files.*</li>
-        </ul>
-
-        <div className="smalltext">
-        *Both US English broadband sample audio files are covered under the Creative Commons license.
-        </div>
-
-        <div style={{
-          paddingRight: '3em',
-          paddingBottom: '2em'
-        }}>
-          The returned result includes the recognized text, {' '}
-          <a className="base--a" href="http://www.ibm.com/watson/developercloud/doc/speech-to-text/output.html#word_alternatives">word alternatives</a>, {' '}
-          and <a className="base--a" href="http://www.ibm.com/watson/developercloud/doc/speech-to-text/output.html#keyword_spotting">spotted keywords</a>. {' '}
-          Some models can <a className="base--a" href="http://www.ibm.com/watson/developercloud/doc/speech-to-text/output.html#speaker_labels">detect multiple speakers</a>; this may slow down performance.
-        </div>
-
-
-        <div className="flex setup">
-          <div className="column">
-
-            <p>Voice Model: <ModelDropdown model={this.state.model} token={this.state.token} onChange={this.handleModelChange} /></p>
-
-            <p className={this.supportsSpeakerLabels() ? 'base--p' : 'base--p_light'}>
-              <input role="checkbox" className="base--checkbox" type="checkbox" checked={this.state.speakerLabels}
-                     onChange={this.handleSpeakerLabelsChange} disabled={!this.supportsSpeakerLabels()} id="speaker-labels" />
-              <label className="base--inline-label" htmlFor="speaker-labels">
-                Detect multiple speakers {this.supportsSpeakerLabels() ? '' : ' (Not supported on current model)'}
-              </label>
-            </p>
-
-          </div>
-          <div className="column">
-
-            <p>Keywords to spot: <input value={this.state.keywords} onChange={this.handleKeywordsChange} type="text"
-                                        id="keywords"placeholder="Type comma separated keywords here (optional)" className="base--input"/></p>
-
-          </div>
-        </div>
-
+      <div>
 
         <div className="flex buttons">
 
@@ -414,21 +271,8 @@ export default React.createClass({
             <Icon type={this.state.audioSource === 'mic' ? 'stop' : 'microphone'} fill={micIconFill} /> Record Audio
           </button>
 
-          <button className={buttonClass} onClick={this.handleUploadClick}>
-            <Icon type={this.state.audioSource === 'upload' ? 'stop' : 'upload'} /> Upload Audio File
-          </button>
-
-          <button className={buttonClass} onClick={this.handleSample1Click}>
-            <Icon type={this.state.audioSource === 'sample-1' ? 'stop' : 'play'} /> Play Sample 1
-          </button>
-
-          <button className={buttonClass} onClick={this.handleSample2Click}>
-            <Icon type={this.state.audioSource === 'sample-2' ? 'stop' : 'play'} /> Play Sample 2
-          </button>
-
         </div>
 
-        {err}
 
         <Tabs selected={0}>
           <Pane label="Text">
@@ -436,18 +280,9 @@ export default React.createClass({
               ? <SpeakersView messages={messages}/>
               : <Transcript messages={messages}/>}
           </Pane>
-          <Pane label="Word Timings and Alternatives">
-            <TimingView messages={messages}/>
-          </Pane>
-          <Pane label={'Keywords ' + getKeywordsSummary(this.state.settingsAtStreamStart.keywords, messages)}>
-            <Keywords messages={messages} keywords={this.state.settingsAtStreamStart.keywords} isInProgress={!!this.state.audioSource}/>
-          </Pane>
-          <Pane label="JSON">
-            <JSONView raw={this.state.rawMessages} formatted={this.state.formattedMessages}/>
-          </Pane>
         </Tabs>
 
-      </Dropzone>
+      </div>
     );
   }
 });

@@ -23,27 +23,9 @@ export default function Layout(props) {
         {/* Bluemix Analytics  - end*/}
       </head>
       <body>
-        <Header
-          mainBreadcrumbs="Speech to Text"
-          mainBreadcrumbsUrl="http://www.ibm.com/watson/developercloud/speech-to-text.html"
-          subBreadcrumbs="Speech to Text Demo"
-          subBreadcrumbsUrl="https://speech-to-text-demo.mybluemix.net"
-
-        />
-        <Jumbotron
-          serviceName="Speech to Text"
-          repository="https://github.com/watson-developer-cloud/speech-to-text-nodejs"
-          documentation="http://www.ibm.com/watson/developercloud/doc/speech-to-text/"
-          apiReference="http://www.ibm.com/watson/developercloud/speech-to-text/api"
-          version="GA" serviceIcon="/images/stt.svg"
-          startInBluemix="https://console.ng.bluemix.net/registration/?target=/catalog/services/speech-to-text/"
-          description="The IBM Watson Speech to Text service uses speech recognition capabilities to convert Arabic, English, Spanish, French, Brazilian Portuguese, Japanese, and Mandarin speech into text."
-        />
         <div id="root">
           {props.children}
         </div>
-        <Footer/>
-        <script type="text/javascript" src="scripts/vendor/google-analytics.js" defer async></script>
       </body>
     </html>
   );
